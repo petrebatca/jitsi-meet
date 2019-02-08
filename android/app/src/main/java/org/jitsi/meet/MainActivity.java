@@ -24,17 +24,21 @@ import android.os.Bundle;
 import android.provider.Settings;
 import android.support.annotation.Nullable;
 import android.support.v4.app.FragmentActivity;
+import android.util.Log;
 import android.view.KeyEvent;
 
 import org.jitsi.meet.sdk.JitsiMeet;
-import org.jitsi.meet.sdk.JitsiMeetFragment;
 import org.jitsi.meet.sdk.JitsiMeetActivityInterface;
 import org.jitsi.meet.sdk.JitsiMeetActivityDelegate;
+import org.jitsi.meet.sdk.JitsiMeetFragment;
+import org.jitsi.meet.sdk.JitsiMeetConferenceOptions;
 
 import com.crashlytics.android.Crashlytics;
 import com.facebook.react.modules.core.PermissionListener;
 import com.google.firebase.dynamiclinks.FirebaseDynamicLinks;
 import io.fabric.sdk.android.Fabric;
+
+import java.net.MalformedURLException;
 
 /**
  * The one and only {@link Activity} that the Jitsi Meet app needs. The
@@ -51,14 +55,36 @@ public class MainActivity extends FragmentActivity implements JitsiMeetActivityI
     private static final int OVERLAY_PERMISSION_REQUEST_CODE
         = (int) (Math.random() * Short.MAX_VALUE);
 
+    private static final String TAG = "MainActivity";
+
     private JitsiMeetFragment getFragment() {
         return (JitsiMeetFragment) getSupportFragmentManager().findFragmentById(R.id.jitsiFragment);
     }
 
+    private JitsiMeetConferenceOptions createOptions() {
+        return new JitsiMeetConferenceOptions()
+                .setWelcomePageEnabled(true)
+                .setServerURL("https://meet.jit.si");
+    }
+
     private void initialize() {
-        JitsiMeetFragment fragment = getFragment();
-        fragment.setWelcomePageEnabled(true);
-        fragment.getJitsiView().join(getIntentUrl(getIntent()));
+        JitsiMeetConferenceOptions options = createOptions();
+        String intentUrl = getIntentUrl(getIntent());
+
+        if (intentUrl != null) {
+            options.setRoom(intentUrl);
+        }
+
+        // Joining without the room option displays the welcome page
+        join(options);
+    }
+
+    private void join(JitsiMeetConferenceOptions options) {
+        try {
+            getFragment().getJitsiView().join(options);
+        } catch (MalformedURLException e) {
+            Log.e(TAG, "Invalid URL", e);
+        }
     }
 
     private @Nullable String getIntentUrl(Intent intent) {
@@ -113,7 +139,7 @@ public class MainActivity extends FragmentActivity implements JitsiMeetActivityI
         String url;
 
         if ((url = getIntentUrl(intent)) != null) {
-            getFragment().getJitsiView().join(url);
+            join(createOptions().setRoom(url));
             return;
         }
 
@@ -145,7 +171,7 @@ public class MainActivity extends FragmentActivity implements JitsiMeetActivityI
                     }
 
                     if (dynamicLink != null) {
-                        getFragment().getJitsiView().join(dynamicLink.toString());
+                        join(createOptions().setRoom(dynamicLink.toString()));
                     }
                 });
         }
